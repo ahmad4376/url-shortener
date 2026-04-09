@@ -1,10 +1,15 @@
-# URL Shortener with Real-Time Analytics
+# Shortly — URL Shortener with Real-Time Analytics
 
 A production-grade URL shortening service built to handle high-traffic scenarios at scale. Designed to learn and implement the core system design concepts every backend engineer needs to know.
 
+## Live Demo
+- **App:** https://url-shortener-peach-six.vercel.app
+- **API:** https://url-shortener-ji04.onrender.com/health
+- **GitHub:** https://github.com/ahmad4376/url-shortener
+
 ## What It Does
 
-Users paste a long URL — a Google Form, a document, a product page — and get back a short link they can share anywhere. Every click is tracked in real time, and an analytics dashboard shows live activity as it happens.
+Users paste a long URL — a Google Form, a document, a product page — and get back a short link they can share anywhere. Every click is tracked in real time, and an analytics dashboard shows live activity as it happens. An optional AI feature generates meaningful, memorable slugs instead of random characters.
 
 ## Why I Built This
 
@@ -53,12 +58,14 @@ Click counting: async via BullMQ — never blocks the redirect.
 ```
 ┌─────────────────────────────────────────────────────┐
 │                    Next.js Frontend                  │
-│              (Dashboard + Link Management)           │
+│     Landing Page + Auth + Dashboard + Real-time      │
+│              Deployed on Vercel                      │
 └─────────────────────┬───────────────────────────────┘
                       │ HTTP / WebSocket
 ┌─────────────────────▼───────────────────────────────┐
 │                  Express.js API                      │
 │         (REST endpoints + Socket.io server)          │
+│              Deployed on Render                      │
 └──────┬──────────────┬──────────────┬────────────────┘
        │              │              │
 ┌──────▼──────┐ ┌─────▼─────┐ ┌────▼────────────────┐
@@ -73,15 +80,16 @@ Click counting: async via BullMQ — never blocks the redirect.
 
 | Layer | Technology | Why |
 |---|---|---|
-| Backend | Node.js + Express | Familiar stack, non-blocking I/O handles concurrent requests well |
+| Backend | Node.js + Express | Non-blocking I/O handles concurrent redirects well |
 | Frontend | Next.js + TypeScript | App Router, SSR, type safety |
 | Database | MongoDB Atlas | Flexible schema, TTL indexes for auto-expiring links |
 | Cache | Redis | In-memory, 50-100x faster than disk for hot URL lookups |
 | Queue | BullMQ | Decouples click counting from redirect path |
 | Real-time | Socket.io | WebSocket-based live analytics dashboard |
 | Auth | JWT + API Keys | JWT for browser sessions, API keys for programmatic access |
+| AI | OpenAI GPT-4o-mini | Generates meaningful slugs from URL content |
 | Security | Helmet + CORS + Rate Limiting | Standard production security practices |
-| Deploy | Docker + docker-compose | Containerized for consistent environments |
+| Deploy | Docker + Vercel + Render | Containerized backend, CDN-hosted frontend |
 
 ## Key Engineering Decisions
 
@@ -91,6 +99,9 @@ Redis sits in front of MongoDB for all redirect lookups. On a cache miss, the re
 ### Async Click Processing
 Click counts are not written synchronously in the redirect handler. Instead, a job is enqueued to BullMQ and the user is redirected instantly. A background worker processes the queue and updates MongoDB. This decouples write throughput from redirect latency entirely.
 
+### AI Slug Generation
+When enabled, the URL is sent to OpenAI GPT-4o-mini which generates a short, descriptive, memorable slug based on the URL content. For example, `https://docs.react.dev/learn` becomes `react-docs-learn` instead of `x7km9p`. Falls back to random generation if the AI call fails — core functionality never depends on an optional enhancement.
+
 ### Dual Authentication
 The API supports both JWT (for browser-based users) and API Keys (for programmatic/server-to-server access). A `flexAuth` middleware tries JWT first, falls back to API key — one middleware, two auth strategies.
 
@@ -99,6 +110,17 @@ Auth routes are limited to 10 requests per 15 minutes (brute force protection). 
 
 ### TTL Indexes for Auto-Expiring Links
 MongoDB TTL indexes automatically delete expired URL documents at the exact expiry time — no cron jobs, no scheduled tasks, no extra code.
+
+## Features
+
+- **URL Shortening** — paste any URL, get a short link instantly
+- **AI Smart Slugs** — optional AI-generated memorable slugs (e.g. `react-docs` instead of `x7km9p`)
+- **Real-time Analytics** — live click count updates via WebSockets, no page refresh needed
+- **Link Management** — activate, deactivate, delete links from your dashboard
+- **Copy to Clipboard** — one-click copy of your short URL
+- **Public API** — generate short URLs programmatically using API keys
+- **Rate Limiting** — abuse protection on all endpoints
+- **Auto-expiring Links** — set TTL on links, MongoDB deletes them automatically
 
 ## API Reference
 
@@ -122,6 +144,19 @@ MongoDB TTL indexes automatically delete expired URL documents at the exact expi
 |---|---|---|---|
 | GET | `/:slug` | Public | Redirect to long URL |
 
+### Example API Usage
+```bash
+# Generate an API key (requires login first)
+curl -X POST https://url-shortener-ji04.onrender.com/api/auth/generate-key \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+
+# Create a short URL with API key
+curl -X POST https://url-shortener-ji04.onrender.com/api/urls \
+  -H "x-api-key: sk_your_api_key" \
+  -H "Content-Type: application/json" \
+  -d '{"longUrl": "https://example.com", "useAI": true}'
+```
+
 ## Running Locally
 
 **Prerequisites:** Docker
@@ -132,13 +167,19 @@ cd url-shortener
 
 # Add your environment variables
 cp server/.env.example server/.env
-# Fill in MONGODB_URI, JWT_SECRET, REDIS_HOST, REDIS_PORT, REDIS_PASSWORD
+# Fill in MONGODB_URI, JWT_SECRET, REDIS_HOST, REDIS_PORT, REDIS_PASSWORD, OPENAI_API_KEY
 
-# Start everything
+# Start the backend
 docker compose up --build
+
+# Start the frontend (separate terminal)
+cd web
+npm install
+npm run dev
 ```
 
-Server runs on `http://localhost:5000`
+- Backend: `http://localhost:5000`
+- Frontend: `http://localhost:3000`
 
 ## What I Learned
 
@@ -149,6 +190,7 @@ Building this project gave me hands-on experience with concepts I previously onl
 - **WebSockets** vs polling is a real engineering decision with measurable tradeoffs — I implemented both and benchmarked the difference
 - **Rate limiting algorithms** (fixed window vs sliding window) have concrete exploitability differences, not just theoretical ones
 - **JWT vs API keys** serve different use cases — browser sessions vs server-to-server — and a well-designed API supports both
+- **AI as an enhancement** — wrapping AI features with fallbacks ensures core functionality never breaks
 
 ## Project Structure
 
@@ -159,21 +201,29 @@ url-shortener/
 │   │   ├── config/
 │   │   │   └── redis.js          # Redis client singleton
 │   │   ├── middleware/
-│   │   │   ├── auth.js           # JWT + API key middleware
+│   │   │   ├── auth.js           # JWT + API key + flexAuth middleware
 │   │   │   └── rateLimiter.js    # Redis-backed rate limiting
 │   │   ├── models/
 │   │   │   ├── User.js           # User schema + bcrypt hook
 │   │   │   └── Url.js            # URL schema + indexes + TTL
 │   │   ├── queues/
 │   │   │   ├── clickQueue.js     # BullMQ queue definition
-│   │   │   └── clickWorker.js    # Async click processor
+│   │   │   └── clickWorker.js    # Async click processor + Socket.io emit
 │   │   ├── routes/
-│   │   │   ├── auth.js           # Auth endpoints
-│   │   │   └── url.js            # URL CRUD endpoints
-│   │   └── index.js              # Express app + Socket.io
+│   │   │   ├── auth.js           # Auth endpoints + API key generation
+│   │   │   └── url.js            # URL CRUD + AI slug generation
+│   │   └── index.js              # Express app + Socket.io + redirect route
 │   ├── Dockerfile
 │   └── .env.example
-├── web/                          # Next.js frontend (in progress)
+├── web/
+│   ├── app/
+│   │   ├── page.tsx              # Landing page
+│   │   ├── login/page.tsx        # Login page
+│   │   ├── register/page.tsx     # Register page
+│   │   └── dashboard/page.tsx    # Dashboard + real-time analytics
+│   └── lib/
+│       ├── api.ts                # Axios instance + interceptors
+│       └── auth.ts               # Auth utilities
 ├── docker-compose.yml
 └── README.md
 ```
