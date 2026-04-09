@@ -26,6 +26,7 @@ export default function DashboardPage() {
     const [fetching, setFetching] = useState(true)
     const [error, setError] = useState('')
     const [copied, setCopied] = useState<string | null>(null)
+    const [useAI, setUseAI] = useState(false)
 
     // Redirect if not logged in
     useEffect(() => {
@@ -75,7 +76,7 @@ export default function DashboardPage() {
         setLoading(true)
 
         try {
-            const response = await api.post('/api/urls', { longUrl })
+            const response = await api.post('/api/urls', { longUrl, useAI })
             setUrls([response.data.urlobject, ...urls])
             setLongUrl('')
         } catch (err: any) {
@@ -145,22 +146,35 @@ export default function DashboardPage() {
                             {error}
                         </div>
                     )}
-                    <form onSubmit={handleCreate} className="flex gap-3">
-                        <input
-                            type="url"
-                            value={longUrl}
-                            onChange={(e) => setLongUrl(e.target.value)}
-                            placeholder="Paste your long URL here..."
-                            className="flex-1 bg-gray-800 text-white px-4 py-2.5 rounded-lg border border-gray-700 focus:outline-none focus:border-blue-500"
-                            required
-                        />
-                        <button
-                            type="submit"
-                            disabled={loading}
-                            className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800 text-white px-6 py-2.5 rounded-lg font-medium transition-colors"
-                        >
-                            {loading ? 'Shortening...' : 'Shorten'}
-                        </button>
+                    <form onSubmit={handleCreate} className="space-y-4">
+                        <div className="flex gap-3">
+                            <input
+                                type="url"
+                                value={longUrl}
+                                onChange={(e) => setLongUrl(e.target.value)}
+                                placeholder="Paste your long URL here..."
+                                className="flex-1 bg-gray-800 text-white px-4 py-2.5 rounded-lg border border-gray-700 focus:outline-none focus:border-blue-500"
+                                required
+                            />
+                            <button
+                                type="submit"
+                                disabled={loading}
+                                className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800 text-white px-6 py-2.5 rounded-lg font-medium transition-colors"
+                            >
+                                {loading ? 'Shortening...' : 'Shorten'}
+                            </button>
+                        </div>
+                        <label className="flex items-center gap-2 cursor-pointer w-fit">
+                            <input
+                                type="checkbox"
+                                checked={useAI}
+                                onChange={(e) => setUseAI(e.target.checked)}
+                                className="w-4 h-4 accent-blue-500"
+                            />
+                            <span className="text-gray-400 text-sm">
+                                ✨ Generate smart slug with AI
+                            </span>
+                        </label>
                     </form>
                 </div>
 

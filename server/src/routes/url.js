@@ -25,23 +25,82 @@ async function generateUniqueSlug() {
     return slug;
 }
 
+
+async function generateAISlug(longUrl) {
+    try {
+        const OpenAI = require('openai');
+        const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+        const response = await openai.chat.completions.create({
+            model: 'gpt-4o-mini',
+            messages: [
+                {
+                    role: 'system',
+                    content: `You are a URL slug generator. Given a URL, generate a short, memorable, lowercase slug of 2-4 words separated by hyphens. 
+                    Rules:
+                    - Only use lowercase letters, numbers, and hyphens
+                    - Max 30 characters
+                    - Make it descriptive and relevant to the URL content
+                    - No special characters
+                    - Return ONLY the slug, nothing else`
+                },
+                {
+                    role: 'user',
+                    content: `Generate a slug for: ${longUrl}`
+                }
+            ],
+            max_tokens: 20,
+        });
+
+        const slug = response.choices[0].message.content
+            .trim()
+            .toLowerCase()
+            .replace(/[^a-z0-9-]/g, '')
+
+        return slug || null;
+    } catch (error) {
+        console.error('AI slug generation failed:', error.message);
+        return null;
+    }
+}
+
 const router = express.Router();
 
 router.post('/', async (req, res) => {
     try {
-        const { longUrl } = req.body;
+        const { longUrl, useAI } = req.body;
 
         if (!longUrl) return res.status(400).json({ error: "Long Url is required" });
         if (!validateLongUrl(longUrl)) return res.status(400).json({ error: "Invalid longUrl" });
 
-        const slug = await generateUniqueSlug();
+        let slug;
+
+        if (useAI) {
+            // Try AI slug first
+            const aiSlug = await generateAISlug(longUrl);
+
+            if (aiSlug) {
+                // Check if AI slug is taken
+                const exists = await Url.findOne({ slug: aiSlug });
+                if (!exists) {
+                    slug = aiSlug;
+                } else {
+                    // AI slug taken — add suffix
+                    slug = `${aiSlug}-${Math.random().toString(36).slice(2, 5)}`;
+                }
+            } else {
+                // AI failed — fall back to random
+                slug = await generateUniqueSlug();
+            }
+        } else {
+            slug = await generateUniqueSlug();
+        }
 
         const url = await Url.create({
             longUrl,
             slug,
             user: req.user._id
         });
-
 
         res.status(201).json({
             message: "Url saved successfully",
