@@ -19,6 +19,7 @@ const { apiLimiter, authLimiter } = require('./middleware/rateLimiter');
 
 
 const app = express();
+app.set('trust proxy', 1); // trust first proxy (Render/Vercel/etc)
 const httpServer = http.createServer(app); // explicit HTTP server
 const io = new Server(httpServer, {
     cors: { origin: '*' }

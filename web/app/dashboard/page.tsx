@@ -108,7 +108,8 @@ export default function DashboardPage() {
     }
 
     const handleCopy = (slug: string) => {
-        navigator.clipboard.writeText(`http://localhost:5000/${slug}`)
+        const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'
+        navigator.clipboard.writeText(`${baseUrl}/${slug}`)
         setCopied(slug)
         setTimeout(() => setCopied(null), 2000)
     }
@@ -193,7 +194,7 @@ export default function DashboardPage() {
                                 <div className="flex-1 min-w-0">
                                     <div className="flex items-center gap-2 mb-1">
                                         <span className="text-blue-400 font-medium">
-                                            localhost:5000/{url.slug}
+                                            {(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000')}/{url.slug}
                                         </span>
                                         {!url.isActive && (
                                             <span className="text-xs bg-red-500/20 text-red-400 px-2 py-0.5 rounded">
